@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotify Clone</title>
+
+  <!-- Bootstrap 5.3 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --sp-black: #121212;
+      --sp-surface: #1a1a1a;
+      --sp-card: #242424;
+      --sp-hover: #2a2a2a;
+      --sp-green: #1DB954;
+      --sp-green-h: #1ed760;
+      --sp-muted: #b3b3b3;
+      --sp-subtle: #535353;
+    }
+
+    body {
+      background: var(--sp-black);
+      color: #fff;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden; /* Prevent body scroll, handle scroll in panels */
+    }
+
+    /* Custom Scrollbar to match Spotify */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--sp-subtle);
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--sp-muted);
+    }
+
+    /* Layout overrides */
+    .app-container {
+      height: calc(100vh - 88px); /* Account for playbar height */
+    }
+
+    .sidebar {
+      width: 260px;
+      background-color: var(--sp-black);
+    }
+
+    .main-area {
+      background: linear-gradient(180deg, #2b2b2b 0%, var(--sp-black) 300px);
+    }
+
+    .sticky-top-bar {
+      background: rgba(18, 18, 18, 0.7);
+      backdrop-filter: blur(10px);
+      z-index: 10;
+    }
+
+    /* Nav Links */
+    .nav-link-sp {
+      color: var(--sp-muted);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 16px;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-link-sp i { font-size: 20px; }
+    .nav-link-sp:hover { color: #fff; }
+
+    /* Library List */
+    .library-item {
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .library-item:hover {
+      background-color: var(--sp-surface);
+    }
+    .library-item:hover * {
+      color: #fff !important; /* Highlight text on hover */
+    }
+
+    /* Main Area Cards */
+    .track-card {
+      background-color: var(--sp-card);
+      transition: background-color 0.3s ease;
+      cursor: pointer;
+    }
+    .track-card:hover {
+      background-color: var(--sp-hover);
+    }
+    .track-cover {
+      width: 100%;
+      aspect-ratio: 1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+    .play-btn-overlay {
+      position: absolute;
+      bottom: 80px;
+      right: 20px;
+      font-size: 48px;
+      color: var(--sp-green);
+      line-height: 1;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.3s ease;
+      filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.3));
+    }
+    .track-card:hover .play-btn-overlay {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .play-btn-overlay:hover {
+      color: var(--sp-green-h);
+      transform: scale(1.05) !important;
+    }
+
+    /* Bottom Playbar */
+    .playbar {
+      height: 88px;
+      background-color: #181818;
+      border-top: 1px solid #282828;
+    }
+    .playbar-thumb {
+      width: 52px;
+      height: 52px;
+      border-radius: 4px;
+    }
+    
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: var(--sp-muted);
+      font-size: 20px;
+      padding: 0 8px;
+      transition: color 0.2s;
+    }
+    .ctrl-btn:hover {
+      color: #fff;
+    }
+    .play-pause-btn {
+      color: #fff;
+      font-size: 32px;
+    }
+    .play-pause-btn:hover {
+      transform: scale(1.05);
+    }
+
+    /* Custom Range Slider for Progress/Volume */
+    .sp-range {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: var(--sp-subtle);
+      border-radius: 2px;
+      outline: none;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .sp-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .sp-range:hover::-webkit-slider-thumb {
+      opacity: 1;
+    }
+    .sp-range:hover {
+      background: var(--sp-green);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Container (Sidebar + Main) -->
+  <div class="d-flex app-container">
+    
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar d-flex flex-column p-2">
+      <!-- Logo -->
+      <div class="p-3 d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-spotify" style="color: var(--sp-green); font-size: 32px;"></i>
+        <span class="fs-5 fw-bold">Mziki</span>
+      </div>
+      
+      <!-- Nav Links -->
+      <nav class="d-flex flex-column px-2 mb-3">
+        <a href="#" class="nav-link-sp text-white"><i class="bi bi-house-door-fill"></i> Home</a>
+        <a href="#" class="nav-link-sp"><i class="bi bi-search"></i> Search</a>
+        <a href="#" class="nav-link-sp"><i class="bi bi-collection-fill"></i> Your Library</a>
+      </nav>
+
+      <!-- Library Header -->
+      <div class="px-3 mt-3 mb-2 d-flex align-items-center justify-content-between" style="color: var(--sp-muted);">
+        <small class="fw-bold" style="letter-spacing: 1px; font-size: 11px;">YOUR LIBRARY</small>
+        <i class="bi bi-plus-lg" style="cursor: pointer;"></i>
+      </div>
+
+      <!-- Library List -->
+      <div id="library-list" class="flex-grow-1 overflow-auto px-2 pb-3">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- MAIN AREA -->
+    <div class="main-area flex-grow-1 d-flex flex-column overflow-auto rounded-3 mt-2 me-2">
+      
+      <!-- Sticky Topbar -->
+      <div class="sticky-top-bar d-flex justify-content-between align-items-center p-3 sticky-top">
+        <div class="d-flex gap-2">
+          <button class="btn btn-dark rounded-circle" style="width: 32px; height: 32px; padding: 0;"><i class="bi bi-chevron-left"></i></button>
+          <button class="btn btn-dark rounded-circle" style="width: 32px; height: 32px; padding: 0;"><i class="bi bi-chevron-right"></i></button>
+        </div>
+        <div class="bg-black rounded-pill p-1 d-flex align-items-center" style="border: 1px solid var(--sp-card);">
+          <i class="bi bi-person-circle fs-4 text-secondary"></i>
+        </div>
+      </div>
+
+      <!-- Main Content Container -->
+      <div class="p-4">
+        <h2 class="fw-bold mb-4">Good evening</h2>
+        
+        <!-- Track Grid -->
+        <div id="track-grid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM PLAYBAR -->
+  <div class="playbar fixed-bottom w-100 px-3 d-flex align-items-center justify-content-between">
+    
+    <!-- Left Col (Track Info) -->
+    <div class="d-flex align-items-center" style="width: 30%;">
+      <img id="pb-thumb" class="playbar-thumb me-3 d-none" style="object-fit: cover;" alt="Cover">
+      <div class="d-flex flex-column justify-content-center">
+        <span id="pb-title" class="fw-bold text-white mb-0 text-truncate" style="font-size: 14px; max-width: 200px;"></span>
+        <span id="pb-artist" class="mb-0 text-truncate" style="font-size: 12px; color: var(--sp-muted); max-width: 200px;"></span>
+      </div>
+      <button class="ctrl-btn ms-3 d-none" id="pb-heart"><i class="bi bi-heart"></i></button>
+    </div>
+
+    <!-- Center Col (Controls) -->
+    <div class="d-flex flex-column align-items-center" style="width: 40%; max-width: 722px;">
+      <div class="d-flex align-items-center gap-3 mb-1">
+        <button class="ctrl-btn"><i class="bi bi-shuffle"></i></button>
+        <button class="ctrl-btn" onclick="prevTrack()"><i class="bi bi-skip-start-fill"></i></button>
+        <button class="ctrl-btn play-pause-btn" onclick="togglePlayPause()">
+          <i id="pb-play-icon" class="bi bi-play-circle-fill"></i>
+        </button>
+        <button class="ctrl-btn" onclick="nextTrack()"><i class="bi bi-skip-end-fill"></i></button>
+        <button class="ctrl-btn"><i class="bi bi-repeat"></i></button>
+      </div>
+      <div class="d-flex align-items-center w-100 gap-2">
+        <span id="pb-curr-time" style="font-size: 11px; color: var(--sp-muted); min-width: 35px; text-align: right;">--:--</span>
+        <input type="range" id="pb-progress" class="sp-range w-100" value="0" step="1" disabled>
+        <span id="pb-total-time" style="font-size: 11px; color: var(--sp-muted); min-width: 35px;">--:--</span>
+      </div>
+    </div>
+
+    <!-- Right Col (Volume) -->
+    <div class="d-flex align-items-center justify-content-end gap-2" style="width: 30%;">
+      <button class="ctrl-btn"><i class="bi bi-music-note-list" style="font-size: 16px;"></i></button>
+      <button class="ctrl-btn"><i class="bi bi-pc-display" style="font-size: 16px;"></i></button>
+      <button class="ctrl-btn ms-2"><i class="bi bi-volume-up" style="font-size: 20px;"></i></button>
+      <input type="range" class="sp-range" style="width: 100px;" value="80">
+    </div>
+
+  </div>
+
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <div id="yt-player" style="position:fixed;bottom:0;left:0;width:200px;height:200px;opacity:0.01;pointer-events:none;z-index:-1;"></div>
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    // --- CONFIGURATION ---
+    const YOUTUBE_API_KEY = 'AIzaSyD_x5f8OIXH0OW5JRVes4TMwVE-IEvDxSk'; // IMPORTANT: Replace with your own key
+
+    // Data
+    let TRACKS = []; // This is now mutable and will be populated by searches
+    let consecutiveSkips = 0; // Tracks unavailable videos skipped
+
+    // State
+    const state = { 
+      currentId: null, 
+      isPlaying: false, 
+      currentTime: 0, 
+      volume: 80, 
+      isShuffle: false, 
+      repeat: 0 
+    };
+
+    let ytPlayer = null;
+    let ytReady = false;
+
+    function onYouTubeIframeAPIReady() {
+      console.log('YouTube IFrame API Script Loaded.');
+      ytPlayer = new YT.Player('yt-player', {
+        height: '200', width: '200',
+        playerVars: { autoplay: 0, controls: 0 },
+        events: {
+          onReady: () => { 
+            console.log('YouTube IFrame API Ready');
+            ytReady = true; 
+            // Set initial volume on player ready
+            setVolume(state.volume);
+          },
+          onStateChange: (e) => {
+            const stateNames = { '-1': 'UNSTARTED', 0: 'ENDED', 1: 'PLAYING', 2: 'PAUSED', 3: 'BUFFERING', 5: 'VIDEO_CUED' };
+            console.log(`YouTube Player State Changed: ${e.data} (${stateNames[e.data] || 'UNKNOWN'})`);
+            // When video starts playing, grab its actual duration
+            if (e.data === YT.PlayerState.PLAYING) {
+              consecutiveSkips = 0; // Reset skips on successful playback
+              const track = TRACKS.find(t => String(t.id) === String(state.currentId));
+              if (track && (!track.duration || track.duration === 0)) { // Only set duration if it's missing (from a search result)
+                track.duration = ytPlayer.getDuration();
+                updatePlaybarUI(); // Update the UI with the correct total time
+              }
+            }
+            if (e.data === YT.PlayerState.ENDED) nextTrack();
+          },
+          onError: (e) => {
+            console.error('YouTube Player Error! Code:', e.data);
+            if (e.data === 101 || e.data === 150) {
+              consecutiveSkips++;
+              if (consecutiveSkips > 5) {
+                alert("Some tracks are unavailable. Try searching for a different version.");
+                consecutiveSkips = 0;
+                if (state.isPlaying) togglePlay(); // stop playback loop
+              } else {
+                console.warn(`This video restricts embedded playback. Skipping... (${consecutiveSkips}/5)`);
+                nextTrack();
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function formatTime(s) {
+      if (isNaN(s)) return "0:00";
+      const m = Math.floor(s / 60);
+      const secs = Math.floor(s % 60);
+      return `${m}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function renderTracks() {
+      const libraryList = document.getElementById('library-list');
+      const trackGrid = document.getElementById('track-grid');
+      libraryList.innerHTML = '';
+      trackGrid.innerHTML = '';
+      
+      TRACKS.forEach(track => {
+        const listItem = document.createElement('div');
+        listItem.className = 'library-item p-2 d-flex align-items-center gap-3 mb-1';
+        listItem.id = `lib-item-${track.id}`;
+        listItem.onclick = () => handleTrackClick(track.id);
+        listItem.innerHTML = `
+          <img src="${track.thumbnail}" style="width: 48px; height: 48px; border-radius: 4px; flex-shrink: 0; object-fit: cover;">
+          <div class="d-flex flex-column text-truncate">
+            <span class="fw-bold text-white text-truncate" style="font-size: 14px;">${track.title}</span>
+            <span class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${track.artist}</span>
+          </div>
+        `;
+        libraryList.appendChild(listItem);
+
+        const cardCol = document.createElement('div');
+        cardCol.className = 'col position-relative';
+        cardCol.innerHTML = `
+          <div class="track-card rounded-3 p-3 h-100" onclick="handleTrackClick('${track.id}')">
+            <img src="${track.thumbnail}" class="track-cover rounded-2 mb-3" style="object-fit: cover;">
+            <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${track.title}</div>
+            <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${track.artist}</div>
+            <i class="bi bi-play-circle-fill play-btn-overlay"></i>
+          </div>
+        `;
+        trackGrid.appendChild(cardCol);
+      });
+    }
+
+    function renderSearchInterface() {
+      const mainArea = document.querySelector('.main-area .p-4');
+      mainArea.innerHTML = `
+        <h2 class="fw-bold mb-4">Search</h2>
+        <form id="search-form">
+          <div class="input-group input-group-lg mb-4">
+            <input type="text" id="search-input" class="form-control bg-dark text-white border-secondary" placeholder="What do you want to listen to?" required>
+            <button class="btn btn-success" type="submit" id="search-button">Search</button>
+          </div>
+        </form>
+        <div id="track-grid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4">
+          <p class="text-muted">Search for artists or songs to get started.</p>
+        </div>
+      `;
+      document.getElementById('search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        performSearch(document.getElementById('search-input').value);
+      });
+    }
+
+    async function performSearch(query) {
+      const searchButton = document.getElementById('search-button');
+      if (searchButton) {
+        searchButton.disabled = true;
+        searchButton.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Searching...`;
+      }
+
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=20&key=${YOUTUBE_API_KEY}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!response.ok || data.error) {
+          throw new Error(data.error?.message || 'API Error');
+        }
+
+        if (state.isPlaying) togglePlay();
+        state.currentId = null;
+
+        // Map API results to our TRACKS format
+        TRACKS = data.items.map(item => ({
+          id: item.id.videoId, // Use videoId as our track ID
+          title: item.snippet.title,
+          artist: item.snippet.channelTitle,
+          ytId: item.id.videoId,
+          thumbnail: item.snippet.thumbnails.medium.url,
+          duration: 0 // We will get this from the player later
+        }));
+
+        renderTracks(); // Re-render the UI with the new tracks
+
+      } catch (error) {
+        console.error('Error fetching from YouTube API:', error);
+        alert(`Failed to fetch search results: ${error.message}`);
+      } finally {
+        if (searchButton) {
+          searchButton.disabled = false;
+          searchButton.innerHTML = 'Search';
+        }
+      }
+    }
+
+    function init() {
+      performSearch('top afrobeats 2024'); // Initial render from YouTube API
+
+      // Wire non-inline buttons
+      document.querySelector('.bi-shuffle').parentElement.onclick = toggleShuffle;
+      document.querySelector('.bi-repeat').parentElement.onclick = cycleRepeat;
+      document.querySelector('.nav-link-sp[href="#"]').onclick = (e) => { // Home button
+        e.preventDefault();
+        document.querySelector('.main-area .p-4').innerHTML = `<h2 class="fw-bold mb-4">Good evening</h2><div id="track-grid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4"></div>`;
+        performSearch('top afrobeats 2024');
+      };
+      document.querySelectorAll('.nav-link-sp')[1].onclick = (e) => { // Search button
+        e.preventDefault();
+        renderSearchInterface();
+      };
+      
+      window.togglePlayPause = togglePlay;
+
+      // Wire progress bar and volume slider
+      document.getElementById('pb-progress').addEventListener('click', seekTo);
+      const volSlider = document.querySelector('.playbar .d-flex.justify-content-end input[type="range"]');
+      volSlider.addEventListener('input', (e) => setVolume(e.target.value));
+    }
+
+    function handleTrackClick(id) {
+      console.log('User clicked track ID:', id);
+      if (state.currentId !== id) {
+        state.isPlaying = true; // Force play state to true before selecting
+        selectTrack(id);
+      } else {
+        togglePlay();
+      }
+    }
+
+    function selectTrack(id) {
+      console.log('Selecting track:', id);
+      if (state.currentId !== id) {
+        state.currentTime = 0;
+      }
+      state.currentId = id;
+      const track = TRACKS.find(t => String(t.id) === String(id));
+
+      if (!track) {
+        console.error('Track not found in array:', id);
+        return;
+      }
+
+      const pbThumb = document.getElementById('pb-thumb');
+      pbThumb.src = track.thumbnail;
+      pbThumb.classList.remove('d-none');
+      document.getElementById('pb-heart').classList.remove('d-none');
+      document.getElementById('pb-title').innerText = track.title;
+      document.getElementById('pb-artist').innerText = track.artist;
+
+      document.querySelectorAll('.library-item').forEach(item => {
+        item.classList.remove('active');
+        item.style.backgroundColor = '';
+      });
+      const activeRow = document.getElementById(`lib-item-${id}`);
+      if (activeRow) {
+        activeRow.classList.add('active');
+        activeRow.style.backgroundColor = 'var(--sp-surface)';
+      }
+
+      updatePlaybarUI();
+      updatePlayIcon();
+
+      if (ytReady && track.ytId) {
+        console.log('Loading YouTube Video ID:', track.ytId);
+        if (state.isPlaying) {
+          ytPlayer.loadVideoById(track.ytId);
+          ytPlayer.mute();
+          setTimeout(() => {
+            ytPlayer.unMute();
+            ytPlayer.setVolume(state.volume);
+          }, 500);
+        } else {
+          ytPlayer.cueVideoById(track.ytId);
+        }
+      } else if (!ytReady) {
+        console.warn('YouTube player is not fully ready yet.');
+      }
+    }
+
+    function updatePlaybarUI() {
+      const track = TRACKS.find(t => String(t.id) === String(state.currentId));
+      if (!track) return; // Exit if track not found (e.g., after a search clears the old list)
+      document.getElementById('pb-total-time').innerText = formatTime(track.duration);
+      const pbProgress = document.getElementById('pb-progress');
+      pbProgress.disabled = false;
+      pbProgress.max = track.duration;
+      updateProgress();
+    }
+
+    function updatePlayIcon() {
+      const playIcon = document.getElementById('pb-play-icon');
+      if (state.isPlaying) {
+        playIcon.className = 'bi bi-pause-circle-fill';
+      } else {
+        playIcon.className = 'bi bi-play-circle-fill';
+      }
+    }
+
+    function togglePlay() {
+      if (!state.currentId && TRACKS.length > 0) {
+        state.isPlaying = true;
+        selectTrack(TRACKS[0].id);
+        return;
+      }
+      if (!state.currentId) return;
+      
+      state.isPlaying = !state.isPlaying;
+      console.log('Toggling play state to:', state.isPlaying ? 'PLAYING' : 'PAUSED');
+      updatePlayIcon();
+      
+      if (state.isPlaying) {
+        if (ytReady && ytPlayer) ytPlayer.playVideo();
+      } else {
+        if (ytReady && ytPlayer) ytPlayer.pauseVideo();
+      }
+    }
+
+    function updateProgress() {
+      if (!state.currentId) return;
+      const track = TRACKS.find(t => String(t.id) === String(state.currentId));
+      const percent = track.duration ? (state.currentTime / track.duration) * 100 : 0;
+      
+      const pbProgress = document.getElementById('pb-progress');
+      pbProgress.value = state.currentTime;
+      pbProgress.style.background = `linear-gradient(to right, var(--sp-green) ${percent}%, var(--sp-subtle) ${percent}%)`;
+      
+      document.getElementById('pb-curr-time').innerText = formatTime(state.currentTime);
+    }
+
+    // Real progress timer, replaces the fake one
+    setInterval(() => {
+      if (!ytReady || !ytPlayer || !state.isPlaying || !state.currentId) return;
+      
+      const track = TRACKS.find(t => String(t.id) === String(state.currentId));
+      if (!track) return;
+
+      const dur = track.duration; // Use our stored duration
+      const cur = ytPlayer.getCurrentTime();
+      if (!dur) return; // Don't update if we don't have a duration yet
+
+      state.currentTime = cur;
+      updateProgress();
+    }, 500);
+
+    function nextTrack() {
+      if (!state.currentId) return;
+      
+      if (state.repeat === 2) {
+        state.currentTime = 0;
+        updateProgress();
+        return;
+      }
+      
+      let nextId;
+      if (state.isShuffle) {
+        const others = TRACKS.filter(t => String(t.id) !== String(state.currentId));
+        if (others.length > 0) {
+          nextId = others[Math.floor(Math.random() * others.length)].id;
+        } else {
+          nextId = state.currentId; // Only one song, play it again
+        }
+      } else {
+      const currentIndex = TRACKS.findIndex(t => String(t.id) === String(state.currentId));
+        nextId = TRACKS[(currentIndex + 1) % TRACKS.length].id;
+      }
+      
+      state.isPlaying = true;
+      selectTrack(nextId);
+    }
+
+    function prevTrack() {
+      if (!state.currentId) return;
+      const curTime = ytPlayer.getCurrentTime();
+      if (curTime > 3) {
+        state.currentTime = 0;
+        ytPlayer.seekTo(0);
+        updateProgress();
+      } else {
+        const currentIndex = TRACKS.findIndex(t => String(t.id) === String(state.currentId));
+        const prevId = TRACKS[(currentIndex - 1 + TRACKS.length) % TRACKS.length].id;
+        state.isPlaying = true;
+        selectTrack(prevId);
+      }
+    }
+
+    function seekTo(event) {
+      if (!state.currentId) return;
+      const pbProgress = document.getElementById('pb-progress');
+      const rect = pbProgress.getBoundingClientRect();
+      const fraction = (event.clientX - rect.left) / rect.width;
+      
+      if (ytReady && ytPlayer) {
+        const duration = ytPlayer.getDuration();
+        const seekTime = fraction * duration;
+        ytPlayer.seekTo(seekTime, true);
+        state.currentTime = seekTime;
+        updateProgress();
+      }
+    }
+
+    function setVolume(value) {
+      state.volume = value;
+      const volIcon = document.querySelector('.playbar .d-flex.justify-content-end .ctrl-btn.ms-2 i');
+      if (volIcon) {
+        if (value == 0) volIcon.className = 'bi bi-volume-mute';
+        else if (value < 50) volIcon.className = 'bi bi-volume-down';
+        else volIcon.className = 'bi bi-volume-up';
+      }
+      const volSlider = document.querySelector('.playbar .d-flex.justify-content-end input[type="range"]');
+      volSlider.value = value;
+      volSlider.style.background = `linear-gradient(to right, var(--sp-green) ${value}%, var(--sp-subtle) ${value}%)`;
+
+      if (ytReady && ytPlayer) ytPlayer.setVolume(value);
+    }
+
+    function toggleShuffle() {
+      state.isShuffle = !state.isShuffle;
+      const btn = document.querySelector('.bi-shuffle').parentElement;
+      btn.style.color = state.isShuffle ? 'var(--sp-green)' : 'var(--sp-muted)';
+    }
+
+    function cycleRepeat() {
+      state.repeat = (state.repeat + 1) % 3;
+      const btn = document.querySelectorAll('.playbar .d-flex.gap-3 .ctrl-btn')[4];
+                  
+      if (state.repeat === 0) {
+        btn.style.color = 'var(--sp-muted)';
+        btn.innerHTML = '<i class="bi bi-repeat"></i>';
+      } else if (state.repeat === 1) {
+        btn.style.color = 'var(--sp-green)';
+        btn.innerHTML = '<i class="bi bi-repeat"></i>';
+      } else {
+        btn.style.color = 'var(--sp-green)';
+        btn.innerHTML = '<div style="position:relative; display:inline-block;"><i class="bi bi-repeat"></i><span style="position:absolute; top:-4px; right:-6px; font-size:8px; font-weight:bold; background:var(--sp-surface); border-radius:50%; width:12px; height:12px; display:flex; align-items:center; justify-content:center; color:#fff;">1</span></div>';
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
