@@ -887,6 +887,28 @@
         menu.style.top = y + 'px';
       }
 
+      function showArtistMenu(e, artistName) {
+        e.preventDefault();
+        const menu = document.getElementById('ctx-menu');
+        
+        menu.innerHTML = `
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="showToast('Link copied!'); document.getElementById('ctx-menu').style.display='none';">Share</div>
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="showToast('Artist radio coming soon'); document.getElementById('ctx-menu').style.display='none';">Go to Radio</div>
+          <hr style="border-color:#404040;margin:4px 0">
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="showToast('Reported'); document.getElementById('ctx-menu').style.display='none';">Report</div>
+        `;
+        
+        menu.style.display = 'block';
+        let x = e.clientX;
+        let y = e.clientY;
+        const rect = menu.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width;
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height;
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+      }
+
       function getTrackById(id) {
         let track = TRACKS.find((t) => String(t.id) === String(id));
         if (track) return track;
@@ -1411,29 +1433,32 @@
 
       function renderArtistPage(artistName, artistThumbnail) {
         document.getElementById("main-content").innerHTML = `
-          <div style="margin: -1.5rem -1.5rem 0 -1.5rem;">
+          <div class="artist-page-wrapper" style="margin: -1.5rem -1.5rem 0 -1.5rem;">
             <!-- HERO -->
-            <div style="position: relative; width: 100%; height: 340px; overflow: hidden;">
+            <div class="artist-hero" style="position: relative; width: 100%; height: 340px; overflow: hidden;">
               <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('${artistThumbnail}') center/cover no-repeat; filter: blur(0px);"></div>
               <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, var(--sp-panel) 100%);"></div>
               <div class="d-flex flex-column justify-content-end p-4" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;">
                 <div style="font-size: 13px; color: rgba(255,255,255,0.8);"><i class="bi bi-patch-check-fill text-white me-1"></i>Verified Artist</div>
-                <h1 class="text-white mb-2" style="font-size: clamp(3rem, 8vw, 6rem); font-weight: 900; letter-spacing: -2px; line-height: 1;">${artistName}</h1>
+                <h1 class="artist-name text-white mb-2" style="font-size: clamp(3rem, 8vw, 6rem); font-weight: 900; letter-spacing: -2px; line-height: 1;">${artistName}</h1>
                 <div style="font-size: 14px; color: rgba(255,255,255,0.8);"><span id="artist-listeners">Loading...</span> monthly listeners</div>
               </div>
             </div>
             
             <!-- ACTIONS -->
-            <div class="d-flex align-items-center gap-4 mb-4 px-4 pt-3">
-              <button class="btn btn-success rounded-circle d-flex align-items-center justify-content-center shadow-lg" style="width: 56px; height: 56px; background-color: var(--sp-green); border: none;">
-                <i class="bi bi-play-fill text-black" style="font-size: 32px; margin-left: 2px;"></i>
-              </button>
+            <div class="artist-actions d-flex align-items-center gap-4 mb-4 px-4 pt-3">
+              <div class="artist-play-container d-flex align-items-center gap-3">
+                <button class="btn text-muted fs-2 hover-white d-md-none p-0 border-0"><i class="bi bi-shuffle"></i></button>
+                <button class="artist-play-btn btn btn-success rounded-circle d-flex align-items-center justify-content-center shadow-lg" style="width: 56px; height: 56px; background-color: var(--sp-green); border: none;">
+                  <i class="bi bi-play-fill text-black" style="font-size: 32px; margin-left: 2px;"></i>
+                </button>
+              </div>
               <button id="artist-follow-btn" class="btn rounded-pill fw-bold" style="border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 6px 20px; font-size: 14px;" onclick="toggleFollowArtist('${artistName}')">Follow</button>
-              <button class="btn text-muted p-0 border-0 fs-4 hover-white"><i class="bi bi-three-dots"></i></button>
+              <button class="btn text-muted p-0 border-0 fs-4 hover-white" onclick="showArtistMenu(event, '${artistName.replace(/'/g, "\\'")}')"><i class="bi bi-three-dots"></i></button>
             </div>
 
             <!-- TABS -->
-            <div class="d-flex gap-4 px-4 mb-4 border-bottom border-secondary" style="font-size: 14px; font-weight: 700;">
+            <div class="artist-tabs d-flex gap-4 px-4 mb-4 border-bottom border-secondary" style="font-size: 14px; font-weight: 700;">
               <a href="#" class="text-white text-decoration-none pb-2" style="border-bottom: 2px solid #fff;">Overview</a>
               <a href="#" class="text-muted text-decoration-none pb-2 hover-white">Popular</a>
               <a href="#" class="text-muted text-decoration-none pb-2 hover-white">Discography</a>
@@ -1532,9 +1557,9 @@
       function renderPopularSongs(songs, container) {
         if (!songs || songs.length === 0) return;
         const html = `
-          <div id="artist-popular" class="mb-5 popular-songs-container" style="max-width: 800px;">
-            <h3 class="fw-bold mb-3 fs-5 mt-4 px-3 px-md-0">Popular</h3>
-            <div class="popular-songs-header" style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; color: var(--sp-muted); font-size: 12px; border-bottom: 1px solid #282828; padding-bottom: 8px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px;">
+          <div id="artist-popular" class="mb-5" style="max-width: 800px;">
+            <h3 class="fw-bold mb-3 fs-5 mt-4">Popular</h3>
+            <div style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; color: var(--sp-muted); font-size: 12px; border-bottom: 1px solid #282828; padding-bottom: 8px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px;">
                 <div class="text-end">#</div>
                 <div>Title</div>
                 <div>Plays</div>
