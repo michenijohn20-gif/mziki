@@ -344,6 +344,147 @@
         color: #fff !important;
         text-decoration: underline;
       }
+
+      @media (max-width: 768px) {
+        body {
+          overflow: auto !important;
+        }
+        .app-container {
+          height: calc(100vh - 72px - 56px) !important;
+        }
+        .sidebar {
+          display: none !important;
+        }
+        .main-area {
+          width: 100% !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+        }
+      
+      /* Mobile Mini-Player */
+      .playbar {
+        height: 64px !important;
+        bottom: 56px !important;
+        border-top: none !important;
+        background-color: #1f1f1f !important;
+        border-radius: 12px !important;
+        width: calc(100% - 16px) !important;
+        margin: 0 8px !important;
+        padding: 0 12px !important;
+      }
+      .playbar-thumb {
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 6px !important;
+      }
+      .playbar > div:nth-child(3) {
+        display: none !important;
+      }
+      .playbar > div:nth-child(2) .range-wrapper,
+      .playbar > div:nth-child(2) button:not(.play-pause-btn) {
+        display: none !important;
+      }
+      .playbar > div:nth-child(2) {
+        width: auto !important;
+      }
+      .playbar > div:nth-child(2) .d-flex {
+        margin-bottom: 0 !important;
+      }
+      .play-pause-btn {
+        width: 36px !important;
+        height: 36px !important;
+      }
+      .playbar > div:nth-child(1) {
+        width: 100% !important;
+        flex-grow: 1 !important;
+      }
+      #pb-heart {
+        margin-left: auto !important;
+        margin-right: 8px !important;
+      }
+      #pb-title, #pb-artist {
+        max-width: calc(100vw - 160px) !important;
+      }
+      
+      /* Topbar Mobile Restyling */
+      .sticky-top-bar > .d-flex.gap-2 {
+        display: none !important;
+      }
+      .sticky-top-bar > div[title="Account"] span,
+      .sticky-top-bar > div[title="Account"] i {
+        display: none !important;
+      }
+      .sticky-top-bar > div[title="Account"] {
+        padding: 0 !important;
+        background: transparent !important;
+      }
+      
+      /* Main Content & Grid Mobile Optimization */
+      #main-content {
+        padding: 0.5rem !important; /* p-2 equivalent */
+      }
+      #main-content > h1.fw-bold.mb-4 {
+        font-size: 1.2rem !important;
+      }
+      #track-grid {
+        --bs-gutter-x: 0.5rem;
+        --bs-gutter-y: 0.5rem;
+      }
+      .track-card {
+        padding: 8px !important;
+      }
+      
+      /* Quick Filter Pills (Mobile Only) */
+      .mobile-filter-row {
+        display: flex !important;
+        overflow-x: auto;
+        scrollbar-width: none;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .mobile-filter-pill {
+        background-color: #121212;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .mobile-filter-pill.active {
+        background-color: var(--sp-green);
+        color: #000;
+      }
+
+      /* Mobile Search View Optimizations */
+      #search-form {
+        max-width: 100% !important;
+      }
+      #search-results-container .row {
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      #search-results-container .col-md-5,
+      #search-results-container .col-md-7 {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .top-result-card {
+        width: 100% !important;
+      }
+      .song-list-item {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+      .song-list-item > div:first-child,
+      .song-list-item > span:last-child {
+        display: none !important;
+      }
+      .song-list-item img {
+        width: 48px !important;
+        height: 48px !important;
+      }
+      }
     </style>
   </head>
   <body>
@@ -1228,6 +1369,14 @@
         }
       }
 
+      function navigateHome() {
+        navigateToState({ view: "home" });
+      }
+
+      function showSearchView() {
+        navigateToState({ view: "search" });
+      }
+
       function navigateToArtist(artistName, artistThumbnail) {
         navigateToState({ view: 'artist', artistName, artistThumbnail });
       }
@@ -1383,9 +1532,9 @@
       function renderPopularSongs(songs, container) {
         if (!songs || songs.length === 0) return;
         const html = `
-          <div id="artist-popular" class="mb-5" style="max-width: 800px;">
-            <h3 class="fw-bold mb-3 fs-5 mt-4">Popular</h3>
-            <div style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; color: var(--sp-muted); font-size: 12px; border-bottom: 1px solid #282828; padding-bottom: 8px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px;">
+          <div id="artist-popular" class="mb-5 popular-songs-container" style="max-width: 800px;">
+            <h3 class="fw-bold mb-3 fs-5 mt-4 px-3 px-md-0">Popular</h3>
+            <div class="popular-songs-header" style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; color: var(--sp-muted); font-size: 12px; border-bottom: 1px solid #282828; padding-bottom: 8px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px;">
                 <div class="text-end">#</div>
                 <div>Title</div>
                 <div>Plays</div>
