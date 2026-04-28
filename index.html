@@ -54,7 +54,7 @@
 
       /* Layout overrides */
       .app-container {
-        height: calc(100vh - 90px); /* Account for playbar height */
+        height: calc(100vh - 72px); /* Account for playbar height */
         padding: 8px;
         gap: 8px;
       }
@@ -74,6 +74,7 @@
         background: linear-gradient(180deg, #222222 0%, var(--sp-panel) 300px);
         background-color: var(--sp-panel);
         border-radius: 8px;
+        transition: background 1.2s ease;
       }
 
       .sticky-top-bar {
@@ -172,8 +173,9 @@
 
       /* Bottom Playbar */
       .playbar {
-        height: 90px;
+        height: 72px;
         background-color: var(--sp-bg);
+        border-top: 1px solid #282828;
       }
       .playbar-thumb {
         width: 56px;
@@ -195,8 +197,8 @@
       .play-pause-btn {
         background: #fff;
         color: #000;
-        width: 32px;
-        height: 32px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -282,6 +284,10 @@
           background-color: var(--sp-hover);
         }
       }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translate(-50%, 20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+      }
       
       .search-history-item {
         padding: 8px 16px;
@@ -311,7 +317,7 @@
         background-color: var(--sp-hover);
       }
       .top-result-card img {
-        width: 92px; height: 92px; border-radius: 50%; object-fit: cover; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        width: 96px; height: 96px; border-radius: 8px; object-fit: cover; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       }
       .top-result-card .play-btn-overlay {
         bottom: 20px; right: 20px;
@@ -337,6 +343,8 @@
     </style>
   </head>
   <body>
+    <div id="api-key-indicator" style="position: fixed; top: 16px; right: 16px; width: 10px; height: 10px; border-radius: 50%; background-color: #1db954; z-index: 9999; /* display: none; in production */" title="API Key Status"></div>
+
     <!-- Top Container (Sidebar + Main) -->
     <div class="d-flex app-container">
       
@@ -443,11 +451,13 @@
               <i class="bi bi-chevron-right"></i>
             </button>
           </div>
-          <div
-            class="bg-black rounded-pill p-1 d-flex align-items-center"
-            style="border: 1px solid var(--sp-card)"
-          >
-            <i class="bi bi-person-circle fs-4 text-secondary"></i>
+          <div class="d-flex align-items-center gap-2 rounded-pill px-2 py-1" 
+               style="background:#1f1f1f; cursor:pointer; border:none; user-select:none"
+               title="Account">
+            <img src="https://ui-avatars.com/api/?background=535353&color=fff&name=You&size=28&bold=true" 
+                 style="width:28px;height:28px;border-radius:50%;" alt="avatar">
+            <span style="font-size:13px;font-weight:700;color:#fff">You</span>
+            <i class="bi bi-chevron-down" style="font-size:11px;color:var(--sp-muted)"></i>
           </div>
         </div>
 
@@ -508,7 +518,7 @@
             <i class="bi bi-skip-start-fill"></i>
           </button>
           <button class="ctrl-btn play-pause-btn" onclick="togglePlayPause()">
-            <i id="pb-play-icon" class="bi bi-play-fill fs-4" style="margin-left: 2px;"></i>
+            <i id="pb-play-icon" class="bi bi-play-fill fs-3" style="margin-left: 2px;"></i>
           </button>
           <button class="ctrl-btn" onclick="nextTrack()">
             <i class="bi bi-skip-end-fill"></i>
@@ -554,14 +564,20 @@
           <i class="bi bi-pc-display" style="font-size: 16px"></i>
         </button>
         <button class="ctrl-btn ms-1">
-          <i class="bi bi-volume-up" style="font-size: 20px"></i>
+          <i id="pb-vol-icon" class="bi bi-volume-up" style="font-size: 20px"></i>
         </button>
-        <div class="range-wrapper d-flex align-items-center" style="width: 100px"><input type="range" class="sp-range w-100" value="80" /></div>
+        <div class="range-wrapper d-flex align-items-center" style="width: 100px"><input type="range" id="pb-vol-slider" class="sp-range w-100" value="80" /></div>
       </div>
     </div>
 
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <div id="ctx-menu" style="
+      position:fixed; z-index:9999; background:#282828; border-radius:4px;
+      padding:4px; min-width:200px; box-shadow:0 16px 24px rgba(0,0,0,0.5);
+      display:none; font-size:14px;">
+    </div>
 
     <div
       id="yt-player"
@@ -580,7 +596,83 @@
 
     <script>
       // --- CONFIGURATION ---
-      const YOUTUBE_API_KEY = "AIzaSyD_x5f8OIXH0OW5JRVes4TMwVE-IEvDxSk"; // IMPORTANT: Replace with your own key
+      const API_KEYS = [
+        'AIzaSyD_x5f8OIXH0OW5JRVes4TMwVE-IEvDxSk',
+        'AIzaSyCZJ2lmOB8abQ90ly_a2JVi-1uugeXDQ3E',
+        'AIzaSyDDFY4OBH3NpZ9wzlQ4AeDXQfAzEF9ploM'
+      ];
+      let currentKeyIndex = 0;
+
+      const KEY_RESET_STORAGE = 'yt_key_index_date';
+      const today = new Date().toDateString();
+      if (localStorage.getItem(KEY_RESET_STORAGE) !== today) {
+        currentKeyIndex = 0;
+        localStorage.setItem(KEY_RESET_STORAGE, today);
+      }
+
+      const updateKeyIndicator = () => {
+        const indicator = document.getElementById('api-key-indicator');
+        if (indicator) {
+          const colors = ['#1db954', '#ffc107', '#e22134'];
+          indicator.style.backgroundColor = colors[currentKeyIndex] || '#e22134';
+        }
+      };
+      updateKeyIndicator(); // Set initial color
+
+      const getKey = () => {
+        console.log(`Active API Key: Key ${currentKeyIndex + 1}`);
+        return API_KEYS[currentKeyIndex];
+      };
+
+      const rotateKey = () => {
+        currentKeyIndex++;
+        if (currentKeyIndex < API_KEYS.length) {
+          console.log(`Switched to API key ${currentKeyIndex + 1}`);
+          updateKeyIndicator();
+          return true; // successfully rotated
+        }
+        return false; // all keys exhausted
+      };
+
+      async function fetchYouTube(buildUrl) {
+        while (currentKeyIndex < API_KEYS.length) {
+          try {
+            const url = buildUrl(getKey());
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.error) {
+              const code = data.error.code;
+              const reason = data.error.errors?.[0]?.reason;
+
+              if (code === 403 && (
+                reason === 'quotaExceeded' || 
+                reason === 'dailyLimitExceeded' ||
+                reason === 'rateLimitExceeded'
+              )) {
+                // Quota hit — rotate key and retry instantly
+                const rotated = rotateKey();
+                if (!rotated) break; // all keys dead
+                continue; // retry with new key
+              }
+
+              // Non-quota error — throw immediately, don't rotate
+              throw new Error(`YouTube API Error ${code}: ${data.error.message}`);
+            }
+
+            // Success — return parsed data
+            return data;
+
+          } catch (err) {
+            if (err.message.startsWith('YouTube API Error')) throw err;
+            throw err;
+          }
+        }
+
+        // All 3 keys exhausted
+        showToast('Daily search limit reached. Try again tomorrow.', 'error');
+        throw new Error('All API keys exhausted');
+      }
 
       // Data
       let TRACKS = []; // This is now mutable and will be populated by searches
@@ -605,6 +697,50 @@
 
       let ytPlayer = null;
       let ytReady = false;
+
+      function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed; bottom: 100px; left: 50%; 
+          transform: translateX(-50%);
+          background: ${type === 'error' ? '#e22134' : '#1db954'};
+          color: white; padding: 12px 24px; border-radius: 4px;
+          font-size: 14px; font-weight: 600; z-index: 9999;
+          animation: fadeInUp 0.3s ease;
+        `;
+        toast.innerText = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
+
+      document.addEventListener('click', () => { 
+        const menu = document.getElementById('ctx-menu');
+        if (menu) menu.style.display = 'none'; 
+      });
+
+      function showContextMenu(e, el) {
+        e.preventDefault();
+        const track = JSON.parse(el.dataset.track);
+        const menu = document.getElementById('ctx-menu');
+        
+        menu.innerHTML = `
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="selectTrack('${track.id}'); document.getElementById('ctx-menu').style.display='none';">Play</div>
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="showToast('Added to queue'); document.getElementById('ctx-menu').style.display='none';">Add to queue</div>
+          <hr style="border-color:#404040;margin:4px 0">
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="toggleHeart(); document.getElementById('ctx-menu').style.display='none';">Save to Liked Songs</div>
+          <div style="padding:8px 12px; cursor:pointer; border-radius:2px; color:#fff" onmouseenter="this.style.background='#3e3e3e'" onmouseleave="this.style.background='transparent'" onclick="showToast('Artist page coming soon'); document.getElementById('ctx-menu').style.display='none';">Go to artist</div>
+        `;
+        
+        menu.style.display = 'block';
+        let x = e.clientX;
+        let y = e.clientY;
+        const rect = menu.getBoundingClientRect();
+        if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width;
+        if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height;
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+      }
 
       function getTrackById(id) {
         let track = TRACKS.find((t) => String(t.id) === String(id));
@@ -671,7 +807,7 @@
                     "Some tracks are unavailable. Try searching for a different version.",
                   );
                   consecutiveSkips = 0;
-                  if (state.isPlaying) togglePlay(); // stop playback loop
+                if (state.isPlaying) togglePlayPause(); // stop playback loop
                 } else {
                   console.warn(
                     `This video restricts embedded playback. Skipping... (${consecutiveSkips}/5)`,
@@ -710,7 +846,13 @@
           liked.push(trackIdStr);
         }
         localStorage.setItem("sp_liked", JSON.stringify(liked));
+        localStorage.setItem("sp_liked_tracks", JSON.stringify(likedTracks));
+
         updateHeartIcon();
+        const icon = document.querySelector('#pb-heart i');
+        icon.style.transition = 'transform 0.15s ease';
+        icon.style.transform = 'scale(1.4)';
+        setTimeout(() => { icon.style.transform = 'scale(1)'; }, 150);
       }
 
       function updateHeartIcon() {
@@ -764,13 +906,21 @@
                 <div class="col-md-7">
                     <h3 class="fw-bold mb-3 fs-5">Songs</h3>
                     <div class="d-flex flex-column gap-1">
-                        ${[...Array(4)].map(() => `<div class="song-list-item skeleton" style="height: 56px;"></div>`).join('')}
+                          ${[...Array(5)].map(() => `<div class="song-list-item skeleton" style="height: 56px;"></div>`).join('')}
                     </div>
                 </div>
             </div>
-            <div class="row">
+              <div class="row mb-4">
                 <div class="col-12">
-                    <h3 class="fw-bold mb-3 fs-5">More from artist</h3>
+                      <h3 class="fw-bold mb-3 fs-5 skeleton" style="width: 200px; height: 24px; background: transparent;"></h3>
+                      <div class="d-flex gap-3 overflow-hidden">
+                          ${[...Array(5)].map(() => `<div class="track-card p-3 flex-shrink-0 skeleton" style="width: 180px; height: 240px;"></div>`).join('')}
+                      </div>
+                  </div>
+              </div>
+              <div class="row">
+                  <div class="col-12">
+                      <h3 class="fw-bold mb-3 fs-5 skeleton" style="width: 200px; height: 24px; background: transparent;"></h3>
                     <div class="d-flex gap-3 overflow-hidden">
                         ${[...Array(5)].map(() => `<div class="track-card p-3 flex-shrink-0 skeleton" style="width: 180px; height: 240px;"></div>`).join('')}
                     </div>
@@ -795,8 +945,8 @@
         }
       }
 
-      function scrollArtistRow(direction) {
-        const container = document.getElementById('more-from-artist-container');
+      function scrollArtistRow(direction, containerId) {
+        const container = document.getElementById(containerId);
         if (container) {
           const scrollAmount = 400;
           container.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
@@ -816,6 +966,8 @@
             "library-item p-2 d-flex align-items-center gap-3 mb-1";
           listItem.id = `lib-item-${track.id}`;
           listItem.onclick = () => handleTrackClick(track.id);
+          listItem.setAttribute('data-track', JSON.stringify(track).replace(/'/g, "&#39;"));
+          listItem.setAttribute('oncontextmenu', 'showContextMenu(event, this)');
           listItem.innerHTML = `
           <img src="${track.thumbnail}" style="width: 48px; height: 48px; border-radius: 4px; flex-shrink: 0; object-fit: cover;">
           <div class="d-flex flex-column text-truncate flex-grow-1">
@@ -833,7 +985,7 @@
           const cardCol = document.createElement("div");
           cardCol.className = "col position-relative";
           cardCol.innerHTML = `
-          <div id="grid-item-${track.id}" class="track-card p-3 h-100" onclick="handleTrackClick('${track.id}')">
+          <div id="grid-item-${track.id}" class="track-card p-3 h-100" onclick="handleTrackClick('${track.id}')" data-track='${JSON.stringify(track).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
             <div class="position-relative mb-3">
                <img src="${track.thumbnail}" class="track-cover w-100 m-0" style="object-fit: cover; aspect-ratio: 1;">
                <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
@@ -853,6 +1005,33 @@
         }
         
         let recent = JSON.parse(localStorage.getItem("sp_recent") || "[]");
+        
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+        const greetingHtml = `<h1 class="fw-bold mb-4" style="font-size: clamp(1.5rem, 3vw, 2rem)">${greeting}</h1>`;
+        
+        let jumpBackInHtml = "";
+        if (recent.length > 0) {
+          jumpBackInHtml = `
+            <style>
+              .jump-back-card:hover { background-color: var(--sp-hover) !important; }
+              .jump-back-card:hover .jb-play-btn { opacity: 1 !important; transform: translateY(0) !important; }
+              .jb-play-btn:hover { transform: scale(1.05) !important; background-color: var(--sp-green-h) !important; }
+            </style>
+            <div class="row row-cols-2 row-cols-lg-3 g-3 mb-5">
+              ${recent.map(track => `
+                <div class="col">
+                  <div class="d-flex align-items-center position-relative jump-back-card" style="background: var(--sp-surface); border-radius: 4px; overflow: hidden; cursor: pointer; height: 56px; transition: background-color 0.3s;" onclick="handleTrackClick('${track.id}')" data-track='${JSON.stringify(track).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
+                    <img src="${track.thumbnail}" style="width: 56px; height: 56px; object-fit: cover; flex-shrink: 0;">
+                    <span class="fw-bold text-white text-truncate ms-3 pe-3" style="font-size: 14px;">${track.title}</span>
+                    <div class="jb-play-btn shadow" style="position: absolute; right: 8px; width: 40px; height: 40px; opacity: 0; transition: all 0.3s ease; transform: translateY(8px); background-color: var(--sp-green); border-radius: 50%; display: flex; align-items: center; justify-content: center;"><i class="bi bi-play-fill text-black" style="font-size: 24px; margin-left: 2px;"></i></div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+
         let recentHtml = "";
         if (recent.length > 0) {
           recentHtml = `
@@ -861,7 +1040,7 @@
             ${recent
               .map(
                 (track) => `
-              <div id="grid-item-${track.id}" class="track-card p-2 flex-shrink-0" style="width: 150px;" onclick="handleTrackClick('${track.id}')">
+              <div id="grid-item-${track.id}" class="track-card p-2 flex-shrink-0" style="width: 150px;" onclick="handleTrackClick('${track.id}')" data-track='${JSON.stringify(track).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                 <img src="${track.thumbnail}" class="track-cover mb-3 w-100" style="height: 126px; object-fit: cover;">
                 <div class="fw-bold text-white text-truncate mb-1" style="font-size: 14px;">${track.title}</div>
                 <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${track.artist}</div>
@@ -874,6 +1053,8 @@
         }
 
         document.getElementById("main-content").innerHTML = `
+        ${greetingHtml}
+        ${jumpBackInHtml}
         ${recentHtml}
         <h2 class="fw-bold mb-4 fs-3 mt-2">Good evening</h2>
         <div id="track-grid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4"></div>
@@ -1040,7 +1221,7 @@
             const c = JSON.parse(cachedStr);
             TRACKS = c.tracks;
             saveSearchHistory(query);
-            renderSearchResultsLayout(c.topItem, c.songItems, c.artistItems, c.durationMap, c.artistName);
+            renderSearchResultsLayout(c);
             renderTracks(); // update sidebar
             return;
           } catch(e) {
@@ -1049,52 +1230,46 @@
         }
 
         try {
-          // Call 1 & Call 2: Top Result and Songs List
-          const topUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=1&key=${YOUTUBE_API_KEY}`;
-          const songsUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=8&key=${YOUTUBE_API_KEY}`;
+          // Call 1: Search for Top Result and Songs (Max 6: 1 Top + 5 Songs)
+          const searchData = await fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=6&key=${key}`);
 
-          const [topRes, songsRes] = await Promise.all([fetch(topUrl), fetch(songsUrl)]);
-          const topData = await topRes.json();
-          const songsData = await songsRes.json();
-
-          if (!topRes.ok || topData.error) {
-            throw new Error(topData.error?.message || "Search API Error");
-          }
-
-          if (!topData.items || topData.items.length === 0) {
+          if (!searchData.items || searchData.items.length === 0) {
             TRACKS = [];
-            renderSearchResultsLayout(null, null, null, null, "");
+            renderSearchResultsLayout(null);
             return;
           }
 
-          // Extract artist from Call 1
-          const artistName = topData.items[0].snippet.channelTitle || query;
+          const topItem = searchData.items[0];
+          const songItems = searchData.items.slice(1);
+          const artistName = topItem.snippet.channelTitle || query;
+          const topTitle = topItem.snippet.title;
           
-          // Call 3 & Details: More from artist and Song Durations
-          const artistUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(artistName + " music")}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=10&key=${YOUTUBE_API_KEY}`;
-          
-          const songIds = songsData.items ? songsData.items.map(i => i.id.videoId).join(',') : '';
-          let detailsReq = Promise.resolve({ json: () => ({ items: [] }) });
+          // Call 2 & 3: More by Artist and Recommended
+          const [artistData, recData] = await Promise.all([
+            fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(artistName + " songs")}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=8&key=${key}`),
+            fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(topTitle + " mix playlist")}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=8&key=${key}`)
+          ]);
+
+          const artistItems = artistData.items || [];
+          const recItems = recData.items || [];
+
+          // Call 4: Details & Durations for all collected videos
+          const allItems = [topItem, ...songItems, ...artistItems, ...recItems];
+          const songIds = Array.from(new Set(allItems.map(i => i.id.videoId))).join(',');
+
+          let detailsData = { items: [] };
           if (songIds) {
-            const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${songIds}&key=${YOUTUBE_API_KEY}`;
-            detailsReq = fetch(detailsUrl);
+            detailsData = await fetchYouTube(key => `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${songIds}&key=${key}`);
           }
 
-          const [artistRes, detailsRes] = await Promise.all([fetch(artistUrl), detailsReq]);
-          const artistData = await artistRes.json();
-          const detailsData = await detailsRes.json();
-
           const durationMap = {};
+          const channelMap = {};
           if (detailsData.items) {
             detailsData.items.forEach(v => {
               durationMap[v.id] = parseISO8601Duration(v.contentDetails.duration);
+              channelMap[v.id] = v.snippet.channelTitle;
             });
           }
-
-          let allItems = [];
-          if(topData.items) allItems.push(...topData.items);
-          if(songsData.items) allItems.push(...songsData.items);
-          if(artistData.items) allItems.push(...artistData.items);
 
           const uniqueTracks = [];
           const seenIds = new Set();
@@ -1105,7 +1280,7 @@
                   uniqueTracks.push({
                       id: vid,
                       title: item.snippet.title,
-                      artist: item.snippet.channelTitle,
+                      artist: channelMap[vid] || item.snippet.channelTitle,
                       ytId: vid,
                       thumbnail: item.snippet.thumbnails.medium.url,
                       duration: durationMap[vid] || 0
@@ -1113,16 +1288,18 @@
               }
           });
 
-          if (state.isPlaying) togglePlay();
+          if (state.isPlaying) togglePlayPause();
           state.currentId = null;
 
           TRACKS = uniqueTracks;
 
           const cacheData = {
-              topItem: topData.items[0],
-              songItems: songsData.items || [],
-              artistItems: artistData.items || [],
-              durationMap: durationMap,
+              topItem,
+              songItems,
+              artistItems,
+              recItems,
+              durationMap,
+              channelMap,
               artistName: artistName,
               tracks: uniqueTracks
           };
@@ -1138,7 +1315,7 @@
           }
 
           saveSearchHistory(query);
-          renderSearchResultsLayout(cacheData.topItem, cacheData.songItems, cacheData.artistItems, cacheData.durationMap, cacheData.artistName);
+          renderSearchResultsLayout(cacheData);
           renderTracks(); // Updates the sidebar
         } catch (error) {
           console.error("Error fetching from YouTube API:", error);
@@ -1146,33 +1323,42 @@
         }
       }
 
-      function renderSearchResultsLayout(topItem, songItems, artistItems, durationMap, artistName) {
+      function renderSearchResultsLayout(cacheData) {
           const container = document.getElementById('search-results-container');
           if(!container) return;
-          if(!topItem) {
+          if(!cacheData || !cacheData.topItem) {
               container.innerHTML = `<p class="text-muted">No results found.</p>`;
               return;
           }
           container.classList.remove('d-none');
+          
+          const { topItem, songItems, artistItems, recItems, durationMap, channelMap, artistName } = cacheData;
+          const topId = topItem.id.videoId;
+          const topChannel = channelMap[topId] || topItem.snippet.channelTitle;
+          const tTop = cacheData.tracks.find(t => t.id === topId);
+
           container.innerHTML = `
               <div class="row mb-4">
                   <div class="col-md-5">
                       <h3 class="fw-bold mb-3 fs-5">Top result</h3>
-                      <div class="top-result-card h-100" onclick="handleTrackClick('${topItem.id.videoId}')">
+                      <div class="top-result-card h-100" onclick="handleTrackClick('${topId}')" data-track='${JSON.stringify(tTop).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                           <img src="${topItem.snippet.thumbnails.medium.url}" alt="cover">
                           <h2 class="fw-bold text-white mb-1 fs-3 text-truncate">${topItem.snippet.title}</h2>
-                          <span class="text-muted fw-bold">${topItem.snippet.channelTitle} <span class="badge bg-dark ms-2 text-uppercase fs-6 pb-1">Song</span></span>
+                          <span class="text-white fw-bold">${artistName} <span class="badge bg-dark ms-2 text-uppercase fs-6 pb-1">Song</span></span>
+                          <div class="text-muted mt-1 fw-bold" style="font-size: 14px;">Album • ${topChannel}</div>
                           <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
                       </div>
                   </div>
                   <div class="col-md-7">
                       <h3 class="fw-bold mb-3 fs-5">Songs</h3>
                       <div class="d-flex flex-column gap-1">
-                          ${songItems.slice(0, 4).map((item, index) => {
+                          ${songItems.map((item, index) => {
                               const trackId = item.id.videoId;
                               const dur = durationMap[trackId] || 0;
+                              const channel = channelMap[trackId] || item.snippet.channelTitle;
+                              const tSong = cacheData.tracks.find(t => t.id === trackId);
                               return `
-                                  <div id="song-item-${trackId}" class="song-list-item" onclick="handleTrackClick('${trackId}')">
+                                  <div id="song-item-${trackId}" class="song-list-item" onclick="handleTrackClick('${trackId}')" data-track='${JSON.stringify(tSong).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                                       <div class="d-flex align-items-center" style="width: 40px; justify-content: center;">
                                           <span class="track-num text-muted">${index + 1}</span>
                                           <i class="bi bi-play-fill play-icon fs-5"></i>
@@ -1180,7 +1366,7 @@
                                       <img src="${item.snippet.thumbnails.medium.url}">
                                       <div class="d-flex flex-column text-truncate flex-grow-1 me-3">
                                           <span class="text-white fw-bold text-truncate">${item.snippet.title}</span>
-                                          <span class="text-muted text-truncate" style="font-size: 13px;">${item.snippet.channelTitle}</span>
+                                          <span class="text-muted text-truncate" style="font-size: 13px;">${channel}</span>
                                       </div>
                                       <span class="text-muted" style="font-size: 13px;">${formatTime(dur)}</span>
                                   </div>
@@ -1189,23 +1375,46 @@
                       </div>
                   </div>
               </div>
-              <div class="row">
+              <div class="row mb-4">
                   <div class="col-12 position-relative">
                       <h3 class="fw-bold mb-3 fs-5">More from ${artistName}</h3>
-                      <button id="scroll-left-btn" class="btn btn-dark rounded-circle position-absolute start-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(-1)" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-left"></i></button>
+                      <button class="btn btn-dark rounded-circle position-absolute start-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(-1, 'more-from-artist-container')" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-left"></i></button>
                       <div id="more-from-artist-container" class="d-flex gap-3 overflow-hidden" style="scroll-behavior: smooth; padding-bottom: 12px;">
-                          ${artistItems.map(item => `
-                              <div id="grid-item-${item.id.videoId}" class="track-card p-3 flex-shrink-0" style="width: 180px;" onclick="handleTrackClick('${item.id.videoId}')">
+                          ${artistItems.map(item => {
+                              const tArt = cacheData.tracks.find(t => t.id === item.id.videoId);
+                              return `
+                              <div id="grid-item-${item.id.videoId}" class="track-card p-3 flex-shrink-0" style="width: 180px;" onclick="handleTrackClick('${item.id.videoId}')" data-track='${JSON.stringify(tArt).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                                   <div class="position-relative mb-3">
                                      <img src="${item.snippet.thumbnails.medium.url}" class="track-cover w-100 m-0" style="object-fit: cover; aspect-ratio: 1;">
                                      <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
                                   </div>
                                   <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.snippet.title}</div>
-                                  <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${item.snippet.channelTitle}</div>
+                                  <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${channelMap[item.id.videoId] || item.snippet.channelTitle}</div>
                               </div>
-                          `).join('')}
+                          `}).join('')}
                       </div>
-                      <button id="scroll-right-btn" class="btn btn-dark rounded-circle position-absolute end-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(1)" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-right"></i></button>
+                      <button class="btn btn-dark rounded-circle position-absolute end-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(1, 'more-from-artist-container')" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-right"></i></button>
+                  </div>
+              </div>
+              <div class="row">
+                  <div class="col-12 position-relative">
+                      <h3 class="fw-bold mb-3 fs-5">Recommended</h3>
+                      <button class="btn btn-dark rounded-circle position-absolute start-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(-1, 'recommended-container')" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-left"></i></button>
+                      <div id="recommended-container" class="d-flex gap-3 overflow-hidden" style="scroll-behavior: smooth; padding-bottom: 12px;">
+                          ${recItems.map(item => {
+                              const tRec = cacheData.tracks.find(t => t.id === item.id.videoId);
+                              return `
+                              <div id="grid-item-${item.id.videoId}" class="track-card p-3 flex-shrink-0" style="width: 180px;" onclick="handleTrackClick('${item.id.videoId}')" data-track='${JSON.stringify(tRec).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
+                                  <div class="position-relative mb-3">
+                                     <img src="${item.snippet.thumbnails.medium.url}" class="track-cover w-100 m-0" style="object-fit: cover; aspect-ratio: 1;">
+                                     <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
+                                  </div>
+                                  <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.snippet.title}</div>
+                                  <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${channelMap[item.id.videoId] || item.snippet.channelTitle}</div>
+                              </div>
+                          `}).join('')}
+                      </div>
+                      <button class="btn btn-dark rounded-circle position-absolute end-0 top-50 translate-middle-y z-2" onclick="scrollArtistRow(1, 'recommended-container')" style="box-shadow: 0 4px 12px rgba(0,0,0,0.5);"><i class="bi bi-chevron-right"></i></button>
                   </div>
               </div>
           `;
@@ -1214,10 +1423,7 @@
 
       function init() {
         // Load default results silently, then render home view
-        fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent("top afrobeats 2024")}&type=video&videoCategoryId=10&videoEmbeddable=true&topicId=/m/04rlf&maxResults=20&key=${YOUTUBE_API_KEY}`,
-        )
-          .then((res) => res.json())
+        fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent("top afrobeats 2024")}&type=video&videoCategoryId=10&videoEmbeddable=true&topicId=/m/04rlf&maxResults=20&key=${key}`)
           .then((data) => {
             if (data.items) {
               TRACKS = data.items.map((item) => ({
@@ -1258,7 +1464,7 @@
           navigateToState({ view: "library" });
         };
 
-        window.togglePlayPause = togglePlay;
+        window.togglePlayPause = togglePlayPause;
 
         // Wire progress bar and volume slider
         const pbProgress = document.getElementById("pb-progress");
@@ -1278,10 +1484,39 @@
           seekTo();
         });
 
-        const volSlider = document.querySelector(
-          '.playbar .d-flex.justify-content-end input[type="range"]',
-        );
+        const volSlider = document.getElementById("pb-vol-slider");
         volSlider.addEventListener("input", (e) => setVolume(e.target.value));
+
+        document.addEventListener("keydown", (e) => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+          if (e.code === 'Space') {
+            e.preventDefault();
+            togglePlayPause();
+          } else if (e.key === 'ArrowRight' && e.ctrlKey) {
+            nextTrack();
+          } else if (e.key === 'ArrowLeft' && e.ctrlKey) {
+            prevTrack();
+          } else if (e.key === 'ArrowRight') {
+            if (ytReady && ytPlayer) {
+              state.currentTime += 10;
+              ytPlayer.seekTo(state.currentTime, true);
+              updateProgress();
+            }
+          } else if (e.key === 'ArrowLeft') {
+            if (ytReady && ytPlayer) {
+              state.currentTime = Math.max(0, state.currentTime - 10);
+              ytPlayer.seekTo(state.currentTime, true);
+              updateProgress();
+            }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setVolume(Math.min(100, parseInt(state.volume) + 5));
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setVolume(Math.max(0, parseInt(state.volume) - 5));
+          }
+        });
       }
 
       function handleTrackClick(id) {
@@ -1290,8 +1525,34 @@
           state.isPlaying = true; // Force play state to true before selecting
           selectTrack(id);
         } else {
-          togglePlay();
+          togglePlayPause();
         }
+      }
+
+      function extractDominantColor(imageUrl, callback) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function () {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          let r = 0, g = 0, b = 0, count = 0;
+
+          for (let i = 0; i < data.length; i += 40) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            count++;
+          }
+
+          callback(Math.floor(r / count), Math.floor(g / count), Math.floor(b / count));
+        };
+        img.src = imageUrl;
       }
 
       function selectTrack(id) {
@@ -1306,6 +1567,11 @@
           console.error("Track not found in array:", id);
           return;
         }
+
+        extractDominantColor(track.thumbnail, (r, g, b) => {
+          const mainArea = document.querySelector(".main-area");
+          if (mainArea) mainArea.style.background = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.7) 0%, var(--sp-panel) 400px)`;
+        });
 
         const pbThumb = document.getElementById("pb-thumb");
         pbThumb.src = track.thumbnail;
@@ -1327,6 +1593,39 @@
         updatePlaybarUI();
         updatePlayIcon();
         updateHeartIcon();
+
+        document.title = `${track.title} • ${track.artist}`;
+
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title,
+            artist: track.artist,
+            album: track.artist,
+            artwork: [
+              { src: track.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+              { src: track.thumbnail, sizes: '512x512', type: 'image/jpeg' }
+            ]
+          });
+          navigator.mediaSession.setActionHandler('play', () => {
+            state.isPlaying = true;
+            if (ytReady && ytPlayer) ytPlayer.playVideo();
+            updatePlayIcon(); updateActiveState();
+          });
+          navigator.mediaSession.setActionHandler('pause', () => {
+            state.isPlaying = false;
+            if (ytReady && ytPlayer) ytPlayer.pauseVideo();
+            updatePlayIcon(); updateActiveState();
+          });
+          navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+          navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (ytReady && ytPlayer) {
+              ytPlayer.seekTo(details.seekTime, true);
+              state.currentTime = details.seekTime;
+              updateProgress();
+            }
+          });
+        }
 
         if (ytReady && track.ytId) {
           console.log("Loading YouTube Video ID:", track.ytId);
@@ -1408,15 +1707,15 @@
       function updatePlayIcon() {
         const playIcon = document.getElementById("pb-play-icon");
         if (state.isPlaying) {
-          playIcon.className = "bi bi-pause-fill fs-4";
+          playIcon.className = "bi bi-pause-fill fs-3";
           playIcon.style.marginLeft = "0";
         } else {
-          playIcon.className = "bi bi-play-fill fs-4";
+          playIcon.className = "bi bi-play-fill fs-3";
           playIcon.style.marginLeft = "2px";
         }
       }
 
-      function togglePlay() {
+      function togglePlayPause() {
         if (!state.currentId && TRACKS.length > 0) {
           state.isPlaying = true;
           selectTrack(TRACKS[0].id);
@@ -1539,17 +1838,13 @@
 
       function setVolume(value) {
         state.volume = value;
-        const volIcon = document.querySelector(
-          ".playbar .d-flex.justify-content-end .ctrl-btn.ms-2 i",
-        );
+        const volIcon = document.getElementById("pb-vol-icon");
         if (volIcon) {
           if (value == 0) volIcon.className = "bi bi-volume-mute";
           else if (value < 50) volIcon.className = "bi bi-volume-down";
           else volIcon.className = "bi bi-volume-up";
         }
-        const volSlider = document.querySelector(
-          '.playbar .d-flex.justify-content-end input[type="range"]',
-        );
+        const volSlider = document.getElementById("pb-vol-slider");
         volSlider.value = value;
         volSlider.style.background = `linear-gradient(to right, var(--sp-green) ${value}%, var(--sp-subtle) ${value}%)`;
 
@@ -1560,10 +1855,14 @@
 
       function toggleShuffle() {
         state.isShuffle = !state.isShuffle;
-        const btn = document.querySelector(".bi-shuffle").parentElement;
-        btn.style.color = state.isShuffle
-          ? "var(--sp-green)"
-          : "var(--sp-muted)";
+        const btn = document.querySelector(".bi-shuffle").closest(".ctrl-btn");
+        
+        btn.style.color = "";
+        if (state.isShuffle) {
+          btn.innerHTML = '<span style="display:flex;flex-direction:column;align-items:center;gap:2px"><i class="bi bi-shuffle"></i><span style="width:4px;height:4px;background:var(--sp-green);border-radius:50%;display:block"></span></span>';
+        } else {
+          btn.innerHTML = '<i class="bi bi-shuffle"></i>';
+        }
       }
 
       function cycleRepeat() {
@@ -1572,16 +1871,16 @@
           ".playbar .d-flex.gap-3 .ctrl-btn",
         )[4];
 
+        btn.style.color = "";
+
         if (state.repeat === 0) {
-          btn.style.color = "var(--sp-muted)";
           btn.innerHTML = '<i class="bi bi-repeat"></i>';
         } else if (state.repeat === 1) {
-          btn.style.color = "var(--sp-green)";
-          btn.innerHTML = '<i class="bi bi-repeat"></i>';
-        } else {
-          btn.style.color = "var(--sp-green)";
           btn.innerHTML =
-            '<div style="position:relative; display:inline-block;"><i class="bi bi-repeat"></i><span style="position:absolute; top:-4px; right:-6px; font-size:8px; font-weight:bold; background:var(--sp-surface); border-radius:50%; width:12px; height:12px; display:flex; align-items:center; justify-content:center; color:#fff;">1</span></div>';
+            '<span style="display:flex;flex-direction:column;align-items:center;gap:2px"><i class="bi bi-repeat"></i><span style="width:4px;height:4px;background:var(--sp-green);border-radius:50%;display:block"></span></span>';
+        } else {
+          btn.innerHTML =
+            '<span style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="position:relative; display:inline-block;"><i class="bi bi-repeat"></i><span style="position:absolute; top:-4px; right:-6px; font-size:8px; font-weight:bold; background:var(--sp-surface); border-radius:50%; width:12px; height:12px; display:flex; align-items:center; justify-content:center; color:#fff;">1</span></div><span style="width:4px;height:4px;background:var(--sp-green);border-radius:50%;display:block"></span></span>';
         }
       }
 
