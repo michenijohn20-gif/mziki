@@ -360,10 +360,12 @@
           margin: 0 !important;
           border-radius: 0 !important;
         }
+
       
       /* Mobile Mini-Player */
       .playbar {
         height: 64px !important;
+        bottom: 60px !important;
         bottom: 56px !important;
         border-top: none !important;
         background-color: #1f1f1f !important;
@@ -433,6 +435,10 @@
       .track-card {
         padding: 8px !important;
       }
+      #main-content > div { margin-left: 0 !important; margin-right: 0 !important; margin-top: 0 !important; }
+      #mob-nav { display: flex !important; }
+      #mob-nav { flex-direction: row !important; }
+    
       
       /* Quick Filter Pills (Mobile Only) */
       .mobile-filter-row {
@@ -2381,7 +2387,73 @@
       }
 
       document.addEventListener("DOMContentLoaded", init);
+
+      function mobNavSetActive(index) {
+        for (let i = 0; i < 3; i++) {
+          const btn = document.getElementById('mob-nav-' + i);
+          if (btn) btn.style.color = i === index ? '#fff' : '#b3b3b3';
+        }
+        if (index !== 2) {
+          const drawer = document.getElementById('mob-library-drawer');
+          if (drawer) drawer.style.display = 'none';
+        }
+      }
+
+      function mobToggleLibrary() {
+        const drawer = document.getElementById('mob-library-drawer');
+        const isOpen = drawer.style.display === 'flex';
+        if (isOpen) {
+          drawer.style.display = 'none';
+        } else {
+          // Clone library list content into drawer
+          const src = document.getElementById('library-list');
+          const dest = document.getElementById('mob-library-list');
+          if (src && dest) dest.innerHTML = src.innerHTML;
+          drawer.style.display = 'flex';
+          drawer.style.flexDirection = 'column';
+        }
+      }
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
+    <nav id="mob-nav" style="
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0;
+      width: 100%;
+      height: 60px;
+      background: #0a0a0a;
+      border-top: 1px solid #282828;
+      z-index: 300;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-around;
+    ">
+      <button onclick="navigateHome(); mobNavSetActive(0)" id="mob-nav-0" style="background:none;border:none;color:#b3b3b3;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:0 16px;">
+        <i class="bi bi-house-door-fill" style="font-size:22px"></i>Home
+      </button>
+      <button onclick="showSearchView(); mobNavSetActive(1)" id="mob-nav-1" style="background:none;border:none;color:#b3b3b3;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:0 16px;">
+        <i class="bi bi-search" style="font-size:22px"></i>Search
+      </button>
+      <button onclick="mobToggleLibrary(); mobNavSetActive(2)" id="mob-nav-2" style="background:none;border:none;color:#b3b3b3;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:0 16px;">
+        <i class="bi bi-collection" style="font-size:22px"></i>Library
+      </button>
+    </nav>
+
+    <div id="mob-library-drawer" style="
+      display:none;
+      position:fixed;
+      top:0;left:0;
+      width:100%;height:100%;
+      background:#121212;
+      z-index:400;
+      overflow-y:auto;
+      flex-direction:column;
+    ">
+      <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #282828;">
+        <span style="font-size:16px;font-weight:700;color:#fff">Your Library</span>
+        <button onclick="mobToggleLibrary()" style="background:none;border:none;color:#fff;font-size:22px;"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div id="mob-library-list" style="padding:8px;"></div>
+    </div>
   </body>
 </html>
