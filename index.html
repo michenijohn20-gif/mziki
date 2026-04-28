@@ -340,6 +340,10 @@
       .song-list-item:hover .play-icon {
         display: block;
       }
+      .artist-link:hover {
+        color: #fff !important;
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
@@ -494,8 +498,9 @@
           ></span>
           <span
             id="pb-artist"
-            class="mb-0 text-truncate"
-            style="font-size: 12px; color: var(--sp-muted); max-width: 200px"
+            class="mb-0 text-truncate artist-link"
+            style="font-size: 12px; color: var(--sp-muted); max-width: 200px; cursor: pointer"
+            onclick="if(state.currentId){ const t=getTrackById(state.currentId); navigateToArtist(t.artist, t.thumbnail); }"
           ></span>
         </div>
         <button
@@ -592,7 +597,6 @@
         z-index: -1;
       "
     ></div>
-    <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
       // --- CONFIGURATION ---
@@ -747,6 +751,9 @@
         if (track) return track;
         let recent = JSON.parse(localStorage.getItem("sp_recent") || "[]");
         track = recent.find((t) => String(t.id) === String(id));
+        if (track) return track;
+        let liked = JSON.parse(localStorage.getItem("sp_liked_tracks") || "[]");
+        track = liked.find((t) => String(t.id) === String(id));
         return track;
       }
 
@@ -828,7 +835,9 @@
       }
 
       function parseISO8601Duration(duration) {
+        if (!duration) return 0;
         const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+        if (!match) return 0;
         const hours = (parseInt(match[1]) || 0);
         const minutes = (parseInt(match[2]) || 0);
         const seconds = (parseInt(match[3]) || 0);
@@ -839,11 +848,16 @@
       function toggleHeart() {
         if (!state.currentId) return;
         let liked = JSON.parse(localStorage.getItem("sp_liked") || "[]");
+        let likedTracks = JSON.parse(localStorage.getItem("sp_liked_tracks") || "[]");
         const trackIdStr = String(state.currentId);
+        
         if (liked.includes(trackIdStr)) {
           liked = liked.filter((id) => id !== trackIdStr);
+          likedTracks = likedTracks.filter((t) => String(t.id) !== trackIdStr);
         } else {
           liked.push(trackIdStr);
+          const track = getTrackById(state.currentId);
+          if (track) likedTracks.push(track);
         }
         localStorage.setItem("sp_liked", JSON.stringify(liked));
         localStorage.setItem("sp_liked_tracks", JSON.stringify(likedTracks));
@@ -972,7 +986,7 @@
           <img src="${track.thumbnail}" style="width: 48px; height: 48px; border-radius: 4px; flex-shrink: 0; object-fit: cover;">
           <div class="d-flex flex-column text-truncate flex-grow-1">
             <span class="fw-bold text-white text-truncate" style="font-size: 14px;">${track.title}</span>
-            <span class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${track.artist}</span>
+            <div class="text-truncate"><span class="artist-link" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${track.artist.replace(/'/g, "\\'")}', '${track.thumbnail}')">${track.artist}</span></div>
           </div>
           <div class="equalizer d-none me-2">
             <div class="eq-bar"></div>
@@ -991,7 +1005,7 @@
                <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
             </div>
             <div class="fw-bold text-white text-truncate mb-1" style="font-size: 16px;">${track.title}</div>
-            <div class="text-truncate" style="color: var(--sp-muted); font-size: 14px;">${track.artist}</div>
+            <div class="text-truncate"><span class="artist-link" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${track.artist.replace(/'/g, "\\'")}', '${track.thumbnail}')">${track.artist}</span></div>
           </div>
         `;
           if (trackGrid) trackGrid.appendChild(cardCol);
@@ -1043,7 +1057,7 @@
               <div id="grid-item-${track.id}" class="track-card p-2 flex-shrink-0" style="width: 150px;" onclick="handleTrackClick('${track.id}')" data-track='${JSON.stringify(track).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                 <img src="${track.thumbnail}" class="track-cover mb-3 w-100" style="height: 126px; object-fit: cover;">
                 <div class="fw-bold text-white text-truncate mb-1" style="font-size: 14px;">${track.title}</div>
-                <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${track.artist}</div>
+                <div class="text-truncate"><span class="artist-link" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${track.artist.replace(/'/g, "\\'")}', '${track.thumbnail}')">${track.artist}</span></div>
               </div>
             `,
               )
@@ -1183,6 +1197,8 @@
             }
           } else if (stateObj.view === "library") {
             renderLibraryView();
+          } else if (stateObj.view === "artist") {
+            renderArtistPage(stateObj.artistName, stateObj.artistThumbnail);
           }
           container.style.opacity = 1;
         }, 200);
@@ -1210,6 +1226,307 @@
           viewIndex++;
           navigateToState(viewHistory[viewIndex], true);
         }
+      }
+
+      function navigateToArtist(artistName, artistThumbnail) {
+        navigateToState({ view: 'artist', artistName, artistThumbnail });
+      }
+
+      function toggleFollowArtist(artistName) {
+        let following = JSON.parse(localStorage.getItem("sp_following") || "[]");
+        if (following.includes(artistName)) {
+          following = following.filter((a) => a !== artistName);
+        } else {
+          following.push(artistName);
+        }
+        localStorage.setItem("sp_following", JSON.stringify(following));
+        updateFollowButton(artistName);
+      }
+
+      function updateFollowButton(artistName) {
+        const btn = document.getElementById("artist-follow-btn");
+        if (!btn) return;
+        const following = JSON.parse(localStorage.getItem("sp_following") || "[]");
+        if (following.includes(artistName)) {
+          btn.innerText = "Following";
+          btn.style.backgroundColor = "var(--sp-green)";
+          btn.style.borderColor = "var(--sp-green)";
+          btn.style.color = "#000";
+        } else {
+          btn.innerText = "Follow";
+          btn.style.backgroundColor = "transparent";
+          btn.style.borderColor = "#fff";
+          btn.style.color = "#fff";
+        }
+      }
+
+      function renderArtistPage(artistName, artistThumbnail) {
+        document.getElementById("main-content").innerHTML = `
+          <div style="margin: -1.5rem -1.5rem 0 -1.5rem;">
+            <!-- HERO -->
+            <div style="position: relative; width: 100%; height: 340px; overflow: hidden;">
+              <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('${artistThumbnail}') center/cover no-repeat; filter: blur(0px);"></div>
+              <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, var(--sp-panel) 100%);"></div>
+              <div class="d-flex flex-column justify-content-end p-4" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;">
+                <div style="font-size: 13px; color: rgba(255,255,255,0.8);"><i class="bi bi-patch-check-fill text-white me-1"></i>Verified Artist</div>
+                <h1 class="text-white mb-2" style="font-size: clamp(3rem, 8vw, 6rem); font-weight: 900; letter-spacing: -2px; line-height: 1;">${artistName}</h1>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.8);"><span id="artist-listeners">Loading...</span> monthly listeners</div>
+              </div>
+            </div>
+            
+            <!-- ACTIONS -->
+            <div class="d-flex align-items-center gap-4 mb-4 px-4 pt-3">
+              <button class="btn btn-success rounded-circle d-flex align-items-center justify-content-center shadow-lg" style="width: 56px; height: 56px; background-color: var(--sp-green); border: none;">
+                <i class="bi bi-play-fill text-black" style="font-size: 32px; margin-left: 2px;"></i>
+              </button>
+              <button id="artist-follow-btn" class="btn rounded-pill fw-bold" style="border: 1px solid #fff; color: #fff; border-radius: 20px; padding: 6px 20px; font-size: 14px;" onclick="toggleFollowArtist('${artistName}')">Follow</button>
+              <button class="btn text-muted p-0 border-0 fs-4 hover-white"><i class="bi bi-three-dots"></i></button>
+            </div>
+
+            <!-- TABS -->
+            <div class="d-flex gap-4 px-4 mb-4 border-bottom border-secondary" style="font-size: 14px; font-weight: 700;">
+              <a href="#" class="text-white text-decoration-none pb-2" style="border-bottom: 2px solid #fff;">Overview</a>
+              <a href="#" class="text-muted text-decoration-none pb-2 hover-white">Popular</a>
+              <a href="#" class="text-muted text-decoration-none pb-2 hover-white">Discography</a>
+              <a href="#" class="text-muted text-decoration-none pb-2 hover-white">Related Artists</a>
+            </div>
+          </div>
+        `;
+
+        updateFollowButton(artistName);
+        if (typeof loadArtistData === 'function') {
+          loadArtistData(artistName);
+        }
+      }
+
+      async function loadArtistData(artistName) {
+        const mainContent = document.getElementById("main-content");
+        let contentArea = document.getElementById("artist-content");
+        if (!contentArea) {
+          contentArea = document.createElement("div");
+          contentArea.id = "artist-content";
+          contentArea.className = "pb-5";
+          mainContent.appendChild(contentArea);
+        }
+        
+        contentArea.innerHTML = '<div id="track-grid" class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-4 mt-2"></div>';
+        showSkeleton();
+
+        try {
+          const [songsRes, albumsRes, relatedRes] = await Promise.all([
+            fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(artistName + ' official audio')}&type=video&videoCategoryId=10&maxResults=10&key=${key}`),
+            fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(artistName + ' full album')}&type=playlist&maxResults=8&key=${key}`),
+            fetchYouTube(key => `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent('artists similar to ' + artistName)}&type=video&videoCategoryId=10&maxResults=8&key=${key}`)
+          ]);
+
+          const songIds = (songsRes.items || []).map(i => i.id.videoId).join(',');
+          let detailsRes = { items: [] };
+          if (songIds) {
+            detailsRes = await fetchYouTube(key => `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${songIds}&key=${key}`);
+          }
+
+          const durationMap = {};
+          const viewCountMap = {};
+          (detailsRes.items || []).forEach(v => {
+            durationMap[v.id] = parseISO8601Duration(v.contentDetails.duration);
+            viewCountMap[v.id] = parseInt(v.statistics.viewCount) || 0;
+          });
+
+          const songs = (songsRes.items || []).map(item => ({
+            id: item.id.videoId,
+            title: item.snippet.title,
+            artist: item.snippet.channelTitle,
+            ytId: item.id.videoId,
+            thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+            duration: durationMap[item.id.videoId] || 0,
+            viewCount: viewCountMap[item.id.videoId] || 0
+          }));
+
+          const playlists = (albumsRes.items || []).map(item => ({
+            id: item.id.playlistId,
+            title: item.snippet.title,
+            artist: item.snippet.channelTitle,
+            thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+            year: item.snippet.publishedAt ? item.snippet.publishedAt.substring(0, 4) : ""
+          }));
+
+          const listenersEl = document.getElementById("artist-listeners");
+          if (listenersEl) {
+            const firstViews = songs.length > 0 ? songs[0].viewCount : 0;
+            if (firstViews > 0) {
+              listenersEl.innerText = (firstViews / 1000000).toFixed(1) + "M";
+            } else {
+              listenersEl.innerText = "1.2M";
+            }
+          }
+
+          contentArea.innerHTML = ''; // clear skeleton
+          
+          if (songs.length === 0 && playlists.length === 0 && (!relatedRes.items || relatedRes.items.length === 0)) {
+             throw new Error("No content found");
+          }
+
+          TRACKS = songs; // Allow click-to-play functionality to locate the track
+
+          renderPopularSongs(songs, contentArea);
+          renderDiscography(playlists, artistName, contentArea);
+          renderRelatedArtists(relatedRes.items || [], contentArea);
+          
+          updateActiveState();
+
+        } catch (err) {
+          console.error("Error loading artist data:", err);
+          contentArea.innerHTML = '<p class="text-muted mt-4">Couldn\'t load content</p>';
+        }
+      }
+
+      function renderPopularSongs(songs, container) {
+        if (!songs || songs.length === 0) return;
+        const html = `
+          <div id="artist-popular" class="mb-5" style="max-width: 800px;">
+            <h3 class="fw-bold mb-3 fs-5 mt-4">Popular</h3>
+            <div style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; gap: 16px; color: var(--sp-muted); font-size: 12px; border-bottom: 1px solid #282828; padding-bottom: 8px; padding-left: 8px; padding-right: 8px; margin-bottom: 8px;">
+                <div class="text-end">#</div>
+                <div>Title</div>
+                <div>Plays</div>
+                <div class="text-end"><i class="bi bi-clock"></i></div>
+            </div>
+            <div class="d-flex flex-column gap-1">
+                ${songs.slice(0, 10).map((song, index) => {
+                    const cleanTitle = song.title.replace(/ \(?(official audio|official video|lyrics|hd|4k)\)?/gi, '').trim();
+                    const plays = song.viewCount > 0 ? (song.viewCount / 1000000).toFixed(1) + 'M plays' : '';
+                    const hiddenClass = index >= 5 ? 'popular-extra d-none' : '';
+                    return `
+                        <div id="song-item-${song.id}" class="song-list-item ${hiddenClass}" style="display: grid; grid-template-columns: 16px 4fr 2fr 1fr; align-items: center; gap: 16px;" onclick="const track = { id: '${song.id}', title: '${cleanTitle.replace(/'/g, "\\'")}', artist: '${song.artist.replace(/'/g, "\\'")}', thumbnail: '${song.thumbnail}', duration: ${song.duration} }; state.isPlaying = true; selectTrack(track.id);" data-track='${JSON.stringify(song).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
+                            <div class="d-flex align-items-center" style="width: 16px; justify-content: flex-end;">
+                                <span class="track-num text-muted">${index + 1}</span>
+                                <i class="bi bi-play-fill play-icon fs-5"></i>
+                            </div>
+                            <div class="d-flex align-items-center overflow-hidden">
+                                <img src="${song.thumbnail}" alt="cover" style="width: 40px; height: 40px; border-radius: 4px; margin-right: 12px; flex-shrink: 0; object-fit: cover;">
+                                <span class="text-white fw-bold text-truncate">${cleanTitle}</span>
+                            </div>
+                            <span class="text-muted text-truncate" style="font-size: 13px;">${plays}</span>
+                            <span class="text-muted text-end" style="font-size: 13px;">${formatTime(song.duration)}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            ${songs.length > 5 ? `<div class="mt-3 ps-2"><span id="see-more-btn" style="color: var(--sp-muted); font-size: 14px; font-weight: 700; cursor: pointer;" onclick="togglePopularSongs()" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--sp-muted)'">See more</span></div>` : ''}
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+      }
+
+      function togglePopularSongs() {
+        const hiddenRows = document.querySelectorAll('.popular-extra');
+        const btn = document.getElementById('see-more-btn');
+        if (!btn) return;
+        const isExpanded = btn.innerText === 'Show less';
+        
+        hiddenRows.forEach(row => {
+            if (isExpanded) {
+                row.classList.add('d-none');
+            } else {
+                row.classList.remove('d-none');
+            }
+        });
+        
+        btn.innerText = isExpanded ? 'See more' : 'Show less';
+      }
+
+      function toggleDiscoFilter(btn) {
+        const container = btn.parentElement;
+        container.querySelectorAll('button').forEach(b => {
+            b.style.backgroundColor = '#2a2a2a';
+            b.style.color = '#fff';
+        });
+        btn.style.backgroundColor = '#fff';
+        btn.style.color = '#000';
+      }
+
+      function renderDiscography(playlists, artistName, container) {
+        if (!playlists || playlists.length === 0) return;
+        
+        let skeletons = '';
+        if (playlists.length < 4) {
+          const numSkeletons = 4 - playlists.length;
+          for (let i = 0; i < numSkeletons; i++) {
+            skeletons += `
+              <div class="track-card p-3 skeleton" style="cursor: default;">
+                  <div class="track-cover mb-3 skeleton" style="width: 100%; aspect-ratio: 1; border-radius: 8px;"></div>
+                  <div class="rounded-1 mb-2 skeleton" style="height: 16px; width: 80%;"></div>
+                  <div class="rounded-1 skeleton" style="height: 14px; width: 50%;"></div>
+              </div>
+            `;
+          }
+        }
+        
+        const html = `
+          <div id="artist-discography" class="mb-5">
+              <h3 class="fw-bold mb-3 fs-5">Discography</h3>
+              <div class="d-flex gap-2 mb-4">
+                  <button class="btn rounded-pill fw-bold px-3 py-1" style="background-color: #fff; color: #000; font-size: 14px; border: none;" onclick="toggleDiscoFilter(this)">All</button>
+                  <button class="btn rounded-pill fw-bold px-3 py-1" style="background-color: #2a2a2a; color: #fff; font-size: 14px; border: none;" onclick="toggleDiscoFilter(this)">Albums</button>
+                  <button class="btn rounded-pill fw-bold px-3 py-1" style="background-color: #2a2a2a; color: #fff; font-size: 14px; border: none;" onclick="toggleDiscoFilter(this)">Singles and EPs</button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px;">
+                  ${playlists.map(item => `
+                      <div class="track-card p-3" onclick="showToast('Opening album: ${item.title.replace(/'/g, "\\'")}')">
+                          <div class="position-relative mb-3">
+                             <img src="${item.thumbnail}" class="track-cover w-100 m-0" style="object-fit: cover; aspect-ratio: 1; border-radius: 8px;">
+                             <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
+                          </div>
+                          <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.title}</div>
+                          <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${item.year} • Album</div>
+                      </div>
+                  `).join('')}
+                  ${skeletons}
+              </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+      }
+
+      function renderRelatedArtists(videos, container) {
+        if (!videos || videos.length === 0) return;
+
+        const uniqueArtists = [];
+        const seenChannels = new Set();
+        
+        videos.forEach(item => {
+          const channelTitle = item.snippet?.channelTitle;
+          const thumbnail = item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url;
+          if (channelTitle && !seenChannels.has(channelTitle)) {
+            seenChannels.add(channelTitle);
+            uniqueArtists.push({
+              name: channelTitle,
+              thumbnail: thumbnail
+            });
+          }
+        });
+        
+        const topArtists = uniqueArtists.slice(0, 6);
+        if (topArtists.length === 0) return;
+
+        const html = `
+          <style>
+            .artist-circular-card:hover img { transform: scale(1.05); }
+          </style>
+          <div id="artist-related" class="mb-5">
+              <h3 class="fw-bold mb-3 fs-5">Fans also like</h3>
+              <div style="display: flex; overflow-x: auto; scrollbar-width: none; gap: 24px; padding-bottom: 16px;">
+                  ${topArtists.map(artist => `
+                      <div class="artist-circular-card" style="width: 160px; text-align: center; cursor: pointer; flex-shrink: 0;" onclick="navigateToArtist('${artist.name.replace(/'/g, "\\'")}', '${artist.thumbnail}')">
+                          <img src="${artist.thumbnail}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto; display: block; transition: transform 0.2s ease;" alt="Artist">
+                          <div class="fw-bold text-white text-truncate" style="font-size: 14px; margin-top: 8px;">${artist.name}</div>
+                          <div class="text-truncate" style="color: var(--sp-muted); font-size: 12px;">Artist</div>
+                      </div>
+                  `).join('')}
+              </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
       }
 
       async function performSearch(query) {
@@ -1344,7 +1661,7 @@
                       <div class="top-result-card h-100" onclick="handleTrackClick('${topId}')" data-track='${JSON.stringify(tTop).replace(/'/g, "&#39;")}' oncontextmenu="showContextMenu(event, this)">
                           <img src="${topItem.snippet.thumbnails.medium.url}" alt="cover">
                           <h2 class="fw-bold text-white mb-1 fs-3 text-truncate">${topItem.snippet.title}</h2>
-                          <span class="text-white fw-bold">${artistName} <span class="badge bg-dark ms-2 text-uppercase fs-6 pb-1">Song</span></span>
+                          <span class="text-white fw-bold artist-link" style="cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${artistName.replace(/'/g, "\\'")}', '${topItem.snippet.thumbnails.medium.url}')">${artistName}</span> <span class="badge bg-dark ms-2 text-uppercase fs-6 pb-1">Song</span>
                           <div class="text-muted mt-1 fw-bold" style="font-size: 14px;">Album • ${topChannel}</div>
                           <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
                       </div>
@@ -1366,7 +1683,7 @@
                                       <img src="${item.snippet.thumbnails.medium.url}">
                                       <div class="d-flex flex-column text-truncate flex-grow-1 me-3">
                                           <span class="text-white fw-bold text-truncate">${item.snippet.title}</span>
-                                          <span class="text-muted text-truncate" style="font-size: 13px;">${channel}</span>
+                                          <span class="artist-link text-truncate" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${channel.replace(/'/g, "\\'")}', '${item.snippet.thumbnails.medium.url}')">${channel}</span>
                                       </div>
                                       <span class="text-muted" style="font-size: 13px;">${formatTime(dur)}</span>
                                   </div>
@@ -1389,7 +1706,7 @@
                                      <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
                                   </div>
                                   <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.snippet.title}</div>
-                                  <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${channelMap[item.id.videoId] || item.snippet.channelTitle}</div>
+                                  <div class="text-truncate"><span class="artist-link" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${(channelMap[item.id.videoId] || item.snippet.channelTitle).replace(/'/g, "\\'")}', '${item.snippet.thumbnails.medium.url}')">${channelMap[item.id.videoId] || item.snippet.channelTitle}</span></div>
                               </div>
                           `}).join('')}
                       </div>
@@ -1410,7 +1727,7 @@
                                      <div class="play-btn-overlay shadow"><i class="bi bi-play-fill text-black" style="font-size: 28px; margin-left: 2px;"></i></div>
                                   </div>
                                   <div class="fw-bold text-white text-truncate mb-1" style="font-size: 15px;">${item.snippet.title}</div>
-                                  <div class="text-truncate" style="color: var(--sp-muted); font-size: 13px;">${channelMap[item.id.videoId] || item.snippet.channelTitle}</div>
+                                  <div class="text-truncate"><span class="artist-link" style="color:var(--sp-muted);font-size:13px;cursor:pointer" onclick="event.stopPropagation(); navigateToArtist('${(channelMap[item.id.videoId] || item.snippet.channelTitle).replace(/'/g, "\\'")}', '${item.snippet.thumbnails.medium.url}')">${channelMap[item.id.videoId] || item.snippet.channelTitle}</span></div>
                               </div>
                           `}).join('')}
                       </div>
@@ -1539,18 +1856,22 @@
           canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
 
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          let r = 0, g = 0, b = 0, count = 0;
-
-          for (let i = 0; i < data.length; i += 40) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            count++;
+          try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            let r = 0, g = 0, b = 0, count = 0;
+  
+            for (let i = 0; i < data.length; i += 40) {
+              r += data[i];
+              g += data[i + 1];
+              b += data[i + 2];
+              count++;
+            }
+  
+            callback(Math.floor(r / count), Math.floor(g / count), Math.floor(b / count));
+          } catch (e) {
+            console.warn("CORS blocked dominant color extraction.");
           }
-
-          callback(Math.floor(r / count), Math.floor(g / count), Math.floor(b / count));
         };
         img.src = imageUrl;
       }
@@ -1597,46 +1918,45 @@
         document.title = `${track.title} • ${track.artist}`;
 
         if ('mediaSession' in navigator) {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: track.title,
-            artist: track.artist,
-            album: track.artist,
-            artwork: [
-              { src: track.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-              { src: track.thumbnail, sizes: '512x512', type: 'image/jpeg' }
-            ]
-          });
-          navigator.mediaSession.setActionHandler('play', () => {
-            state.isPlaying = true;
-            if (ytReady && ytPlayer) ytPlayer.playVideo();
-            updatePlayIcon(); updateActiveState();
-          });
-          navigator.mediaSession.setActionHandler('pause', () => {
-            state.isPlaying = false;
-            if (ytReady && ytPlayer) ytPlayer.pauseVideo();
-            updatePlayIcon(); updateActiveState();
-          });
-          navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
-          navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
-          navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (ytReady && ytPlayer) {
-              ytPlayer.seekTo(details.seekTime, true);
-              state.currentTime = details.seekTime;
-              updateProgress();
-            }
-          });
+          try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: track.title || 'Unknown Title',
+              artist: track.artist || 'Unknown Artist',
+              album: track.artist || 'Unknown Album',
+              artwork: [
+                { src: track.thumbnail || '', sizes: '96x96', type: 'image/jpeg' },
+                { src: track.thumbnail || '', sizes: '512x512', type: 'image/jpeg' }
+              ]
+            });
+            navigator.mediaSession.setActionHandler('play', () => {
+              state.isPlaying = true;
+              if (ytReady && ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+              updatePlayIcon(); updateActiveState();
+            });
+            navigator.mediaSession.setActionHandler('pause', () => {
+              state.isPlaying = false;
+              if (ytReady && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+              updatePlayIcon(); updateActiveState();
+            });
+            navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+            navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+              if (ytReady && ytPlayer && typeof ytPlayer.seekTo === 'function') {
+                ytPlayer.seekTo(details.seekTime, true);
+                state.currentTime = details.seekTime;
+                updateProgress();
+              }
+            });
+          } catch (e) {
+            console.error("MediaSession setup failed:", e);
+          }
         }
 
         if (ytReady && track.ytId) {
           console.log("Loading YouTube Video ID:", track.ytId);
           if (state.isPlaying) {
             ytPlayer.loadVideoById(track.ytId);
-            ytPlayer.mute();
-            ytPlayer.playVideo();
-            setTimeout(() => {
-              ytPlayer.unMute();
-              ytPlayer.setVolume(state.volume);
-            }, 500);
+            if (typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
           } else {
             ytPlayer.cueVideoById(track.ytId);
           }
@@ -1732,9 +2052,9 @@
         updateActiveState();
 
         if (state.isPlaying) {
-          if (ytReady && ytPlayer) ytPlayer.playVideo();
+          if (ytReady && ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
         } else {
-          if (ytReady && ytPlayer) ytPlayer.pauseVideo();
+          if (ytReady && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
         }
       }
 
@@ -1845,10 +2165,12 @@
           else volIcon.className = "bi bi-volume-up";
         }
         const volSlider = document.getElementById("pb-vol-slider");
-        volSlider.value = value;
-        volSlider.style.background = `linear-gradient(to right, var(--sp-green) ${value}%, var(--sp-subtle) ${value}%)`;
+        if (volSlider) {
+          volSlider.value = value;
+          volSlider.style.background = `linear-gradient(to right, var(--sp-green) ${value}%, var(--sp-subtle) ${value}%)`;
+        }
 
-        if (ytReady && ytPlayer) ytPlayer.setVolume(value);
+        if (ytReady && ytPlayer && typeof ytPlayer.setVolume === 'function') ytPlayer.setVolume(value);
         
         localStorage.setItem('sp_volume', value);
       }
@@ -1886,5 +2208,6 @@
 
       document.addEventListener("DOMContentLoaded", init);
     </script>
+    <script src="https://www.youtube.com/iframe_api"></script>
   </body>
 </html>
